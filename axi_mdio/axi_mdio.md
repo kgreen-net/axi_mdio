@@ -1,6 +1,6 @@
 # Overview
 
-The MDIO Controller (mdio_ctrl) bridges an AXI4-Lite register interface to the MDIO bus, enabling software to read and write registers on a 10G Ethernet PHY using the IEEE 802.3 Clause 45 two-frame protocol.
+The MDIO Controller (axi_mdio) bridges an AXI4-Lite register interface to the MDIO bus, enabling software to read and write registers on a 10G Ethernet PHY using the IEEE 802.3 Clause 45 two-frame protocol.
 
 A complete Clause 45 transaction consists of two 64-bit MDIO frames: an address frame that sets the target register, followed by a read or write data frame. The module handles preamble generation, frame serialization/deserialization, MDC clock generation, and tri-state control.
 
@@ -72,11 +72,11 @@ The register interface is an AXI4-Lite subordinate interface (`reg_axi_*` prefix
 
 # Generated Register Block
 
-The register interface logic is generated from `mdio_ctrl_regs.rdl` using [PeakRDL-regblock](https://github.com/SystemRDL/PeakRDL-regblock). The generated files (`mdio_ctrl_regs/mdio_ctrl_regs.sv` and `mdio_ctrl_regs/mdio_ctrl_regs_pkg.sv`) should not be edited by hand. To regenerate after modifying the RDL source:
+The register interface logic is generated from `axi_mdio_regs.rdl` using [PeakRDL-regblock](https://github.com/SystemRDL/PeakRDL-regblock). The generated files (`axi_mdio_regs/axi_mdio_regs.sv` and `axi_mdio_regs/axi_mdio_regs_pkg.sv`) should not be edited by hand. To regenerate after modifying the RDL source:
 
 ```bash
-peakrdl regblock mdio_ctrl/mdio_ctrl_regs.rdl \
-    -o mdio_ctrl/mdio_ctrl_regs \
+peakrdl regblock axi_mdio/axi_mdio_regs.rdl \
+    -o axi_mdio/axi_mdio_regs \
     --cpuif axi4-lite-flat \
     --default-reset rst \
     --err-if-bad-addr

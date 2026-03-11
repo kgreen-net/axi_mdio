@@ -1,4 +1,4 @@
-addrmap mdio_ctrl_regs {
+addrmap axi_mdio_regs {
     default hw = r;
     default sw = rw;
 

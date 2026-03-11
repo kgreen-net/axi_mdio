@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module tb_mdio_ctrl;
+module tb_axi_mdio;
 
     // ================================================================
     //  Parameters
@@ -65,7 +65,7 @@ module tb_mdio_ctrl;
     // ================================================================
     //  DUT
     // ================================================================
-    mdio_ctrl #(
+    axi_mdio #(
         .CLK_FREQ_HZ (CLK_FREQ_HZ),
         .MDC_FREQ_HZ (MDC_FREQ_HZ)
     ) u_dut (
@@ -369,7 +369,7 @@ module tb_mdio_ctrl;
 
     initial begin
         $display("==============================================");
-        $display(" MDIO_CTRL Testbench — xsim");
+        $display(" AXI_MDIO Testbench — xsim");
         $display("==============================================");
 
         // Initialize AXI signals
