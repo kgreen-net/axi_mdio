@@ -1,0 +1,80 @@
+addrmap mdio_ctrl_regs {
+    default hw = r;
+    default sw = rw;
+
+    reg ctrl_reg {
+        field {
+            singlepulse;
+        } go[1] = 0;
+
+        field {} wr_nrd[1] = 0;
+    };
+
+    reg phy_addr_reg {
+        field {} prtad[5] = 0;
+        field { sw = r; hw = na; } rsvd0[3] = 0;
+        field {} devad[5] = 0;
+    };
+
+    reg reg_addr_reg {
+        field {} addr[16] = 0;
+    };
+
+    reg wrdata_reg {
+        field {} data[16] = 0;
+    };
+
+    reg rddata_reg {
+        field {
+            sw = r;
+            hw = w;
+        } data[16] = 0;
+    };
+
+    reg status_reg {
+        field {
+            sw = r;
+            hw = w;
+        } busy[1] = 0;
+
+        field {
+            sw = r;
+            hwset;
+            onread = rclr;
+        } done[1] = 0;
+
+        field {
+            sw = r;
+            hwset;
+            onread = rclr;
+        } error[1] = 0;
+    };
+
+    reg irq_status_reg {
+        field {
+            sw = rw;
+            hwset;
+            onwrite = woclr;
+        } done[1] = 0;
+
+        field {
+            sw = rw;
+            hwset;
+            onwrite = woclr;
+        } error[1] = 0;
+    };
+
+    reg irq_en_reg {
+        field {} done_en[1] = 0;
+        field {} error_en[1] = 0;
+    };
+
+    ctrl_reg       CTRL       @ 0x00;
+    phy_addr_reg   PHY_ADDR   @ 0x04;
+    reg_addr_reg   REG_ADDR   @ 0x08;
+    wrdata_reg     WRDATA     @ 0x0C;
+    rddata_reg     RDDATA     @ 0x10;
+    status_reg     STATUS     @ 0x14;
+    irq_status_reg IRQ_STATUS @ 0x18;
+    irq_en_reg     IRQ_EN     @ 0x1C;
+};
