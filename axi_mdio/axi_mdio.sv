@@ -183,28 +183,137 @@ module axi_mdio #(
         ST_RW_DATA
     } mdio_state_t;
 
-    mdio_state_t state;
+    mdio_state_t state, next_state;
 
     logic [5:0]  bit_cnt;
     logic [31:0] shift_reg;
     logic        is_write;     // Latched write/read direction
     logic        ta_error;
 
-    // ── FSM next-state + output logic ─────────────────────────────────
+    // ── Block 1: Sequential state register ───────────────────────────
+    always_ff @(posedge clk) begin
+        if (rst)
+            state <= ST_IDLE;
+        else
+            state <= next_state;
+    end
+
+    // ── Block 2: Combinational next-state logic ──────────────────────
+    always_comb begin
+        next_state = state; // default: hold current state
+
+        case (state)
+            ST_IDLE: begin
+                if (ctrl_go)
+                    next_state = ST_ADDR_PRE;
+            end
+
+            // ── Frame 1: Address Frame ───────────────────────────
+            ST_ADDR_PRE: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_ST;
+            end
+
+            ST_ADDR_ST: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_OP;
+            end
+
+            ST_ADDR_OP: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_PRTAD;
+            end
+
+            ST_ADDR_PRTAD: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_DEVAD;
+            end
+
+            ST_ADDR_DEVAD: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_TA;
+            end
+
+            ST_ADDR_TA: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_ADDR_DATA;
+            end
+
+            ST_ADDR_DATA: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_TURNAROUND;
+            end
+
+            // ── Inter-frame gap ──────────────────────────────────
+            ST_TURNAROUND: begin
+                if (mdc_fall)
+                    next_state = ST_RW_PRE;
+            end
+
+            // ── Frame 2: Read/Write Frame ────────────────────────
+            ST_RW_PRE: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_RW_ST;
+            end
+
+            ST_RW_ST: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_RW_OP;
+            end
+
+            ST_RW_OP: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_RW_PRTAD;
+            end
+
+            ST_RW_PRTAD: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_RW_DEVAD;
+            end
+
+            ST_RW_DEVAD: begin
+                if (mdc_fall && bit_cnt == 0)
+                    next_state = ST_RW_TA;
+            end
+
+            ST_RW_TA: begin
+                if (is_write) begin
+                    if (mdc_fall && bit_cnt == 0)
+                        next_state = ST_RW_DATA;
+                end else begin
+                    if (mdc_rise && bit_cnt == 0)
+                        next_state = ST_RW_DATA;
+                end
+            end
+
+            ST_RW_DATA: begin
+                if (is_write) begin
+                    if (mdc_fall && bit_cnt == 0)
+                        next_state = ST_IDLE;
+                end else begin
+                    if (mdc_rise && bit_cnt == 0)
+                        next_state = ST_IDLE;
+                end
+            end
+
+            default: next_state = ST_IDLE;
+        endcase
+    end
+
+    // ── Block 3: Sequential output / datapath logic ──────────────────
     always_ff @(posedge clk) begin
         if (rst) begin
-            state          <= ST_IDLE;
-            bit_cnt        <= '0;
-            shift_reg      <= '0;
-            is_write       <= 1'b0;
-            ta_error       <= 1'b0;
-            mdio_oe        <= 1'b0;
-            mdio_out       <= 1'b1;
-            mdc_en         <= 1'b0;
+            bit_cnt         <= '0;
+            shift_reg       <= '0;
+            is_write        <= 1'b0;
+            ta_error        <= 1'b0;
+            mdio_oe         <= 1'b0;
+            mdio_out        <= 1'b1;
+            mdc_en          <= 1'b0;
             captured_rddata <= '0;
-            status_busy    <= 1'b0;
-            status_done    <= 1'b0;
-            status_error   <= 1'b0;
+            status_busy     <= 1'b0;
+            status_done     <= 1'b0;
+            status_error    <= 1'b0;
         end else begin
             // Default: clear single-cycle pulses
             status_done  <= 1'b0;
@@ -226,7 +335,6 @@ module axi_mdio #(
                         mdio_oe     <= 1'b1;
                         mdio_out    <= 1'b1;
                         mdc_en      <= 1'b1;
-                        state       <= ST_ADDR_PRE;
                     end
                 end
 
@@ -239,7 +347,6 @@ module axi_mdio #(
                             // Load ST = 2'b00
                             shift_reg <= {2'b00, 30'd0};
                             bit_cnt   <= 6'd1;
-                            state     <= ST_ADDR_ST;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -254,7 +361,6 @@ module axi_mdio #(
                             // Load OP = 2'b00 (address)
                             shift_reg <= {2'b00, 30'd0};
                             bit_cnt   <= 6'd1;
-                            state     <= ST_ADDR_OP;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -269,7 +375,6 @@ module axi_mdio #(
                             // Load PRTAD (5 bits)
                             shift_reg <= {ctrl_prtad, 27'd0};
                             bit_cnt   <= 6'd4;
-                            state     <= ST_ADDR_PRTAD;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -284,7 +389,6 @@ module axi_mdio #(
                             // Load DEVAD (5 bits)
                             shift_reg <= {ctrl_devad, 27'd0};
                             bit_cnt   <= 6'd4;
-                            state     <= ST_ADDR_DEVAD;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -299,7 +403,6 @@ module axi_mdio #(
                             // Load TA = 2'b10
                             shift_reg <= {2'b10, 30'd0};
                             bit_cnt   <= 6'd1;
-                            state     <= ST_ADDR_TA;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -314,7 +417,6 @@ module axi_mdio #(
                             // Load REG_ADDR (16 bits)
                             shift_reg <= {ctrl_reg_addr, 16'd0};
                             bit_cnt   <= 6'd15;
-                            state     <= ST_ADDR_DATA;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -328,7 +430,6 @@ module axi_mdio #(
                         if (bit_cnt == 0) begin
                             // Inter-frame turnaround: 1 idle cycle
                             mdio_oe <= 1'b0;
-                            state   <= ST_TURNAROUND;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -343,7 +444,6 @@ module axi_mdio #(
                         bit_cnt   <= 6'd31;
                         mdio_oe   <= 1'b1;
                         mdio_out  <= 1'b1;
-                        state     <= ST_RW_PRE;
                     end
                 end
 
@@ -356,7 +456,6 @@ module axi_mdio #(
                             // Load ST = 2'b00
                             shift_reg <= {2'b00, 30'd0};
                             bit_cnt   <= 6'd1;
-                            state     <= ST_RW_ST;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -371,7 +470,6 @@ module axi_mdio #(
                             // Load OP: read=2'b11, write=2'b01
                             shift_reg <= {(is_write ? 2'b01 : 2'b11), 30'd0};
                             bit_cnt   <= 6'd1;
-                            state     <= ST_RW_OP;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -386,7 +484,6 @@ module axi_mdio #(
                             // Load PRTAD (5 bits)
                             shift_reg <= {ctrl_prtad, 27'd0};
                             bit_cnt   <= 6'd4;
-                            state     <= ST_RW_PRTAD;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -401,7 +498,6 @@ module axi_mdio #(
                             // Load DEVAD (5 bits)
                             shift_reg <= {ctrl_devad, 27'd0};
                             bit_cnt   <= 6'd4;
-                            state     <= ST_RW_DEVAD;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -424,7 +520,6 @@ module axi_mdio #(
                                 bit_cnt   <= 6'd1;
                                 mdio_oe   <= 1'b0;
                             end
-                            state <= ST_RW_TA;
                         end else begin
                             bit_cnt <= bit_cnt - 1;
                         end
@@ -441,7 +536,6 @@ module axi_mdio #(
                                 // Load write data (16 bits)
                                 shift_reg <= {ctrl_wrdata, 16'd0};
                                 bit_cnt   <= 6'd15;
-                                state     <= ST_RW_DATA;
                             end else begin
                                 bit_cnt <= bit_cnt - 1;
                             end
@@ -454,7 +548,6 @@ module axi_mdio #(
                                 if (mdio_in != 1'b0)
                                     ta_error <= 1'b1;
                                 bit_cnt <= 6'd15;
-                                state   <= ST_RW_DATA;
                             end else begin
                                 bit_cnt <= bit_cnt - 1;
                             end
@@ -474,7 +567,6 @@ module axi_mdio #(
                                 status_done <= 1'b1;
                                 mdio_oe     <= 1'b0;
                                 mdc_en      <= 1'b0;
-                                state       <= ST_IDLE;
                             end else begin
                                 bit_cnt <= bit_cnt - 1;
                             end
@@ -489,7 +581,6 @@ module axi_mdio #(
                                 status_done  <= 1'b1;
                                 status_error <= ta_error;
                                 mdc_en       <= 1'b0;
-                                state        <= ST_IDLE;
                             end else begin
                                 bit_cnt <= bit_cnt - 1;
                             end
@@ -497,7 +588,7 @@ module axi_mdio #(
                     end
                 end
 
-                default: state <= ST_IDLE;
+                default: ;  // No output changes needed
             endcase
         end
     end
