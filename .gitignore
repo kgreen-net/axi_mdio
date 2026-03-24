@@ -1,0 +1,5 @@
+# Vivado xsim build artifacts
+*.log
+*.pb
+*.jou
+xsim.dir/
