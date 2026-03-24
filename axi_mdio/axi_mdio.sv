@@ -301,6 +301,9 @@ module axi_mdio #(
     end
 
     // ── Block 3: Sequential output / datapath logic ──────────────────
+    // Cases on next_state so outputs are prepared for the incoming state.
+    // Entry actions (state != next_state) set up the new field;
+    // steady-state actions (state == next_state) perform shifting/sampling.
     always_ff @(posedge clk) begin
         if (rst) begin
             bit_cnt         <= '0;
@@ -319,276 +322,268 @@ module axi_mdio #(
             status_done  <= 1'b0;
             status_error <= 1'b0;
 
-            case (state)
+            case (next_state)
                 // ─────────────────────────────────────────────────────
                 ST_IDLE: begin
-                    mdio_oe  <= 1'b0;
-                    mdio_out <= 1'b1;
-                    mdc_en   <= 1'b0;
-                    if (ctrl_go) begin
-                        is_write    <= ctrl_wr_nrd;
-                        ta_error    <= 1'b0;
-                        status_busy <= 1'b1;
-                        // Load preamble: 32 ones
-                        shift_reg   <= 32'hFFFF_FFFF;
-                        bit_cnt     <= 6'd31;
-                        mdio_oe     <= 1'b1;
-                        mdio_out    <= 1'b1;
-                        mdc_en      <= 1'b1;
+                    if (state == ST_RW_DATA) begin
+                        // Transaction completing
+                        status_busy <= 1'b0;
+                        status_done <= 1'b1;
+                        mdio_oe     <= 1'b0;
+                        mdc_en      <= 1'b0;
+                        if (is_write) begin
+                            // Output last write data bit
+                            mdio_out  <= shift_reg[31];
+                            shift_reg <= {shift_reg[30:0], 1'b0};
+                        end else begin
+                            // Capture last read data bit
+                            captured_rddata <= {captured_rddata[14:0], mdio_in};
+                            status_error    <= ta_error;
+                        end
+                    end else begin
+                        // Steady-state idle
+                        mdio_oe  <= 1'b0;
+                        mdio_out <= 1'b1;
+                        mdc_en   <= 1'b0;
                     end
                 end
 
                 // ── Frame 1: Address Frame ───────────────────────────
                 ST_ADDR_PRE: begin
-                    if (mdc_fall) begin
+                    if (state == ST_IDLE) begin
+                        // Entry: load preamble (32 ones)
+                        is_write    <= ctrl_wr_nrd;
+                        ta_error    <= 1'b0;
+                        status_busy <= 1'b1;
+                        shift_reg   <= 32'hFFFF_FFFF;
+                        bit_cnt     <= 6'd31;
+                        mdio_oe     <= 1'b1;
+                        mdio_out    <= 1'b1;
+                        mdc_en      <= 1'b1;
+                    end else if (mdc_fall) begin
+                        // Shifting preamble
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load ST = 2'b00
-                            shift_reg <= {2'b00, 30'd0};
-                            bit_cnt   <= 6'd1;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_ST: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_PRE) begin
+                        // Entry: output last preamble bit, load ST = 2'b00
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {2'b00, 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load OP = 2'b00 (address)
-                            shift_reg <= {2'b00, 30'd0};
-                            bit_cnt   <= 6'd1;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_OP: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_ST) begin
+                        // Entry: output last ST bit, load OP = 2'b00 (address)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {2'b00, 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load PRTAD (5 bits)
-                            shift_reg <= {ctrl_prtad, 27'd0};
-                            bit_cnt   <= 6'd4;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_PRTAD: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_OP) begin
+                        // Entry: output last OP bit, load PRTAD (5 bits)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {ctrl_prtad, 27'd0};
+                        bit_cnt   <= 6'd4;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load DEVAD (5 bits)
-                            shift_reg <= {ctrl_devad, 27'd0};
-                            bit_cnt   <= 6'd4;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_DEVAD: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_PRTAD) begin
+                        // Entry: output last PRTAD bit, load DEVAD (5 bits)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {ctrl_devad, 27'd0};
+                        bit_cnt   <= 6'd4;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load TA = 2'b10
-                            shift_reg <= {2'b10, 30'd0};
-                            bit_cnt   <= 6'd1;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_TA: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_DEVAD) begin
+                        // Entry: output last DEVAD bit, load TA = 2'b10
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {2'b10, 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load REG_ADDR (16 bits)
-                            shift_reg <= {ctrl_reg_addr, 16'd0};
-                            bit_cnt   <= 6'd15;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_ADDR_DATA: begin
-                    if (mdc_fall) begin
+                    if (state == ST_ADDR_TA) begin
+                        // Entry: output last TA bit, load REG_ADDR (16 bits)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {ctrl_reg_addr, 16'd0};
+                        bit_cnt   <= 6'd15;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Inter-frame turnaround: 1 idle cycle
-                            mdio_oe <= 1'b0;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 // ── Inter-frame gap ──────────────────────────────────
                 ST_TURNAROUND: begin
-                    if (mdc_fall) begin
-                        // Load preamble for frame 2: 32 ones
-                        shift_reg <= 32'hFFFF_FFFF;
-                        bit_cnt   <= 6'd31;
-                        mdio_oe   <= 1'b1;
-                        mdio_out  <= 1'b1;
+                    if (state == ST_ADDR_DATA) begin
+                        // Entry: output last addr data bit, release bus
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {shift_reg[30:0], 1'b0};
+                        mdio_oe   <= 1'b0;
                     end
+                    // Steady-state: wait for mdc_fall (no outputs to drive)
                 end
 
                 // ── Frame 2: Read/Write Frame ────────────────────────
                 ST_RW_PRE: begin
-                    if (mdc_fall) begin
+                    if (state == ST_TURNAROUND) begin
+                        // Entry: load preamble for frame 2 (32 ones)
+                        shift_reg <= 32'hFFFF_FFFF;
+                        bit_cnt   <= 6'd31;
+                        mdio_oe   <= 1'b1;
+                        mdio_out  <= 1'b1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load ST = 2'b00
-                            shift_reg <= {2'b00, 30'd0};
-                            bit_cnt   <= 6'd1;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_ST: begin
-                    if (mdc_fall) begin
+                    if (state == ST_RW_PRE) begin
+                        // Entry: output last preamble bit, load ST = 2'b00
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {2'b00, 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load OP: read=2'b11, write=2'b01
-                            shift_reg <= {(is_write ? 2'b01 : 2'b11), 30'd0};
-                            bit_cnt   <= 6'd1;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_OP: begin
-                    if (mdc_fall) begin
+                    if (state == ST_RW_ST) begin
+                        // Entry: output last ST bit, load OP
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {(is_write ? 2'b01 : 2'b11), 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load PRTAD (5 bits)
-                            shift_reg <= {ctrl_prtad, 27'd0};
-                            bit_cnt   <= 6'd4;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_PRTAD: begin
-                    if (mdc_fall) begin
+                    if (state == ST_RW_OP) begin
+                        // Entry: output last OP bit, load PRTAD (5 bits)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {ctrl_prtad, 27'd0};
+                        bit_cnt   <= 6'd4;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            // Load DEVAD (5 bits)
-                            shift_reg <= {ctrl_devad, 27'd0};
-                            bit_cnt   <= 6'd4;
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_DEVAD: begin
-                    if (mdc_fall) begin
+                    if (state == ST_RW_PRTAD) begin
+                        // Entry: output last PRTAD bit, load DEVAD (5 bits)
+                        mdio_out  <= shift_reg[31];
+                        shift_reg <= {ctrl_devad, 27'd0};
+                        bit_cnt   <= 6'd4;
+                    end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        if (bit_cnt == 0) begin
-                            if (is_write) begin
-                                // Write TA = 2'b10, we drive
-                                shift_reg <= {2'b10, 30'd0};
-                                bit_cnt   <= 6'd1;
-                                mdio_oe   <= 1'b1;
-                            end else begin
-                                // Read TA: release bus, PHY drives
-                                shift_reg <= '0;
-                                bit_cnt   <= 6'd1;
-                                mdio_oe   <= 1'b0;
-                            end
-                        end else begin
-                            bit_cnt <= bit_cnt - 1;
-                        end
+                        bit_cnt   <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_TA: begin
-                    if (is_write) begin
-                        // Write TA: we drive 1 then 0
+                    if (state == ST_RW_DEVAD) begin
+                        // Entry: output last DEVAD bit, set up TA
+                        mdio_out <= shift_reg[31];
+                        if (is_write) begin
+                            // Write TA = 2'b10, we drive
+                            shift_reg <= {2'b10, 30'd0};
+                            bit_cnt   <= 6'd1;
+                            mdio_oe   <= 1'b1;
+                        end else begin
+                            // Read TA: release bus, PHY drives
+                            shift_reg <= '0;
+                            bit_cnt   <= 6'd1;
+                            mdio_oe   <= 1'b0;
+                        end
+                    end else if (is_write) begin
+                        // Write TA: shift out 1 then 0
                         if (mdc_fall) begin
                             mdio_out  <= shift_reg[31];
                             shift_reg <= {shift_reg[30:0], 1'b0};
-                            if (bit_cnt == 0) begin
-                                // Load write data (16 bits)
-                                shift_reg <= {ctrl_wrdata, 16'd0};
-                                bit_cnt   <= 6'd15;
-                            end else begin
-                                bit_cnt <= bit_cnt - 1;
-                            end
+                            bit_cnt   <= bit_cnt - 1;
                         end
                     end else begin
-                        // Read TA: PHY drives, we sample
-                        if (mdc_rise) begin
-                            if (bit_cnt == 0) begin
-                                // Second TA bit — PHY should drive 0
-                                if (mdio_in != 1'b0)
-                                    ta_error <= 1'b1;
-                                bit_cnt <= 6'd15;
-                            end else begin
-                                bit_cnt <= bit_cnt - 1;
-                            end
-                        end
+                        // Read TA: wait for PHY
+                        if (mdc_rise)
+                            bit_cnt <= bit_cnt - 1;
                     end
                 end
 
                 ST_RW_DATA: begin
-                    if (is_write) begin
+                    if (state == ST_RW_TA) begin
+                        // Entry from TA phase
+                        if (is_write) begin
+                            // Output last TA bit, load write data (16 bits)
+                            mdio_out  <= shift_reg[31];
+                            shift_reg <= {ctrl_wrdata, 16'd0};
+                            bit_cnt   <= 6'd15;
+                        end else begin
+                            // Second TA bit — PHY should drive 0
+                            if (mdio_in != 1'b0)
+                                ta_error <= 1'b1;
+                            bit_cnt <= 6'd15;
+                        end
+                    end else if (is_write) begin
                         // Write: shift out data on falling edge
                         if (mdc_fall) begin
                             mdio_out  <= shift_reg[31];
                             shift_reg <= {shift_reg[30:0], 1'b0};
-                            if (bit_cnt == 0) begin
-                                // Transaction complete
-                                status_busy <= 1'b0;
-                                status_done <= 1'b1;
-                                mdio_oe     <= 1'b0;
-                                mdc_en      <= 1'b0;
-                            end else begin
-                                bit_cnt <= bit_cnt - 1;
-                            end
+                            bit_cnt   <= bit_cnt - 1;
                         end
                     end else begin
                         // Read: shift in data on rising edge
                         if (mdc_rise) begin
                             captured_rddata <= {captured_rddata[14:0], mdio_in};
-                            if (bit_cnt == 0) begin
-                                // Transaction complete
-                                status_busy  <= 1'b0;
-                                status_done  <= 1'b1;
-                                status_error <= ta_error;
-                                mdc_en       <= 1'b0;
-                            end else begin
-                                bit_cnt <= bit_cnt - 1;
-                            end
+                            bit_cnt         <= bit_cnt - 1;
                         end
                     end
                 end
 
-                default: ;  // No output changes needed
+                default: ;
             endcase
         end
     end
