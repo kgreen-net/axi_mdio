@@ -305,24 +305,11 @@ module axi_mdio #(
     // Entry actions (state != next_state) set up the new field;
     // steady-state actions (state == next_state) perform shifting/sampling.
     always_ff @(posedge clk) begin
-        if (rst) begin
-            bit_cnt         <= '0;
-            shift_reg       <= '0;
-            is_write        <= 1'b0;
-            ta_error        <= 1'b0;
-            mdio_oe         <= 1'b0;
-            mdio_out        <= 1'b1;
-            mdc_en          <= 1'b0;
-            captured_rddata <= '0;
-            status_busy     <= 1'b0;
-            status_done     <= 1'b0;
-            status_error    <= 1'b0;
-        end else begin
-            // Default: clear single-cycle pulses
-            status_done  <= 1'b0;
-            status_error <= 1'b0;
+        // Default: clear single-cycle pulses
+        status_done  <= 1'b0;
+        status_error <= 1'b0;
 
-            case (next_state)
+        case (next_state)
                 // ─────────────────────────────────────────────────────
                 ST_IDLE: begin
                     if (state == ST_RW_DATA) begin
@@ -342,9 +329,10 @@ module axi_mdio #(
                         end
                     end else begin
                         // Steady-state idle
-                        mdio_oe  <= 1'b0;
-                        mdio_out <= 1'b1;
-                        mdc_en   <= 1'b0;
+                        mdio_oe     <= 1'b0;
+                        mdio_out    <= 1'b1;
+                        mdc_en      <= 1'b0;
+                        status_busy <= 1'b0;
                     end
                 end
 
@@ -585,7 +573,6 @@ module axi_mdio #(
 
                 default: ;
             endcase
-        end
     end
 
 endmodule
