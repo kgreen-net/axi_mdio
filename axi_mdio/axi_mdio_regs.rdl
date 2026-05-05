@@ -8,6 +8,7 @@ addrmap axi_mdio_regs {
         } go[1] = 0;
 
         field {} wr_nrd[1] = 0;
+        field {} pre_dis[1] = 0;
     };
 
     reg phy_addr_reg {

@@ -88,7 +88,7 @@ All registers are 32-bit, byte-addressed, 4-byte aligned.
 
 | Offset | Name     | R/W | Bits                              | Description                                                                                      |
 |--------|----------|-----|-----------------------------------|--------------------------------------------------------------------------------------------------|
-| 0x00   | CTRL     | R/W | [0] go, [1] wr_nrd                | Write 1 to bit 0 to trigger transaction (self-clears). Bit 1 selects direction: 1=write, 0=read. |
+| 0x00   | CTRL     | R/W | [0] go, [1] wr_nrd, [2] pre_dis   | Bit 0: trigger transaction (self-clears). Bit 1: direction (1=write, 0=read). Bit 2: suppress 32-bit preamble on both frames. |
 | 0x04   | PHY_ADDR | R/W | [4:0] prtad, [12:8] devad         | PHY port address (PRTAD) and device address (DEVAD).                                             |
 | 0x08   | REG_ADDR | R/W | [15:0] addr                       | 16-bit register address for the Clause 45 address frame.                                         |
 | 0x0C   | WRDATA   | R/W | [15:0] data                       | Write data to send during MDIO write operations.                                                 |

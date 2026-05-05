@@ -57,6 +57,7 @@ module axi_mdio #(
 
     logic        ctrl_go;
     logic        ctrl_wr_nrd;
+    logic        ctrl_pre_dis;
     logic [4:0]  ctrl_prtad;
     logic [4:0]  ctrl_devad;
     logic [15:0] ctrl_reg_addr;
@@ -105,6 +106,7 @@ module axi_mdio #(
     // Connect hwif_out → internal control signals
     assign ctrl_go       = regs_hwif_out.CTRL.go.value;
     assign ctrl_wr_nrd   = regs_hwif_out.CTRL.wr_nrd.value;
+    assign ctrl_pre_dis  = regs_hwif_out.CTRL.pre_dis.value;
     assign ctrl_prtad    = regs_hwif_out.PHY_ADDR.prtad.value;
     assign ctrl_devad    = regs_hwif_out.PHY_ADDR.devad.value;
     assign ctrl_reg_addr = regs_hwif_out.REG_ADDR.addr.value;
@@ -188,6 +190,7 @@ module axi_mdio #(
     logic [5:0]  bit_cnt;
     logic [31:0] shift_reg;
     logic        is_write;     // Latched write/read direction
+    logic        is_pre_dis;   // Latched preamble disable
     logic        ta_error;
 
     // ── Block 1: Sequential state register ───────────────────────────
@@ -205,7 +208,7 @@ module axi_mdio #(
         case (state)
             ST_IDLE: begin
                 if (ctrl_go)
-                    next_state = ST_ADDR_PRE;
+                    next_state = ctrl_pre_dis ? ST_ADDR_ST : ST_ADDR_PRE;
             end
 
             // ── Frame 1: Address Frame ───────────────────────────
@@ -247,7 +250,7 @@ module axi_mdio #(
             // ── Inter-frame gap ──────────────────────────────────
             ST_TURNAROUND: begin
                 if (mdc_fall)
-                    next_state = ST_RW_PRE;
+                    next_state = is_pre_dis ? ST_RW_ST : ST_RW_PRE;
             end
 
             // ── Frame 2: Read/Write Frame ────────────────────────
@@ -341,6 +344,7 @@ module axi_mdio #(
                     if (state == ST_IDLE) begin
                         // Entry: load preamble (32 ones)
                         is_write    <= ctrl_wr_nrd;
+                        is_pre_dis  <= ctrl_pre_dis;
                         ta_error    <= 1'b0;
                         status_busy <= 1'b1;
                         shift_reg   <= 32'hFFFF_FFFF;
@@ -357,7 +361,18 @@ module axi_mdio #(
                 end
 
                 ST_ADDR_ST: begin
-                    if (state == ST_ADDR_PRE) begin
+                    if (state == ST_IDLE) begin
+                        // Entry (preamble disabled): init and load ST = 2'b00
+                        is_write    <= ctrl_wr_nrd;
+                        is_pre_dis  <= ctrl_pre_dis;
+                        ta_error    <= 1'b0;
+                        status_busy <= 1'b1;
+                        mdc_en      <= 1'b1;
+                        mdio_oe     <= 1'b1;
+                        mdio_out    <= 1'b0;
+                        shift_reg   <= {2'b00, 30'd0};
+                        bit_cnt     <= 6'd1;
+                    end else if (state == ST_ADDR_PRE) begin
                         // Entry: output last preamble bit, load ST = 2'b00
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {2'b00, 30'd0};
@@ -461,7 +476,13 @@ module axi_mdio #(
                 end
 
                 ST_RW_ST: begin
-                    if (state == ST_RW_PRE) begin
+                    if (state == ST_TURNAROUND) begin
+                        // Entry (preamble disabled): load ST = 2'b00
+                        mdio_oe   <= 1'b1;
+                        mdio_out  <= 1'b0;
+                        shift_reg <= {2'b00, 30'd0};
+                        bit_cnt   <= 6'd1;
+                    end else if (state == ST_RW_PRE) begin
                         // Entry: output last preamble bit, load ST = 2'b00
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {2'b00, 30'd0};

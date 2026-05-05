@@ -286,6 +286,10 @@ module axi_mdio_regs (
                 logic next;
                 logic load_next;
             } wr_nrd;
+            struct {
+                logic next;
+                logic load_next;
+            } pre_dis;
         } CTRL;
         struct {
             struct {
@@ -350,6 +354,9 @@ module axi_mdio_regs (
             struct {
                 logic value;
             } wr_nrd;
+            struct {
+                logic value;
+            } pre_dis;
         } CTRL;
         struct {
             struct {
@@ -445,6 +452,29 @@ module axi_mdio_regs (
         end
     end
     assign hwif_out.CTRL.wr_nrd.value = field_storage.CTRL.wr_nrd.value;
+    // Field: axi_mdio_regs.CTRL.pre_dis
+    always_comb begin
+        automatic logic [0:0] next_c;
+        automatic logic load_next_c;
+        next_c = field_storage.CTRL.pre_dis.value;
+        load_next_c = '0;
+        if(decoded_reg_strb.CTRL && decoded_req_is_wr) begin // SW write
+            next_c = (field_storage.CTRL.pre_dis.value & ~decoded_wr_biten[2:2]) | (decoded_wr_data[2:2] & decoded_wr_biten[2:2]);
+            load_next_c = '1;
+        end
+        field_combo.CTRL.pre_dis.next = next_c;
+        field_combo.CTRL.pre_dis.load_next = load_next_c;
+    end
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            field_storage.CTRL.pre_dis.value <= 1'h0;
+        end else begin
+            if(field_combo.CTRL.pre_dis.load_next) begin
+                field_storage.CTRL.pre_dis.value <= field_combo.CTRL.pre_dis.next;
+            end
+        end
+    end
+    assign hwif_out.CTRL.pre_dis.value = field_storage.CTRL.pre_dis.value;
     // Field: axi_mdio_regs.PHY_ADDR.prtad
     always_comb begin
         automatic logic [4:0] next_c;
@@ -707,7 +737,8 @@ module axi_mdio_regs (
     logic [31:0] readback_array[8];
     assign readback_array[0][0:0] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.go.value : '0;
     assign readback_array[0][1:1] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.wr_nrd.value : '0;
-    assign readback_array[0][31:2] = '0;
+    assign readback_array[0][2:2] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.pre_dis.value : '0;
+    assign readback_array[0][31:3] = '0;
     assign readback_array[1][4:0] = (decoded_reg_strb.PHY_ADDR && !decoded_req_is_wr) ? field_storage.PHY_ADDR.prtad.value : '0;
     assign readback_array[1][7:5] = (decoded_reg_strb.PHY_ADDR && !decoded_req_is_wr) ? 3'h0 : '0;
     assign readback_array[1][12:8] = (decoded_reg_strb.PHY_ADDR && !decoded_req_is_wr) ? field_storage.PHY_ADDR.devad.value : '0;

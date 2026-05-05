@@ -61,8 +61,13 @@ package axi_mdio_regs_pkg;
     } axi_mdio_regs__ctrl_reg__wr_nrd__out_t;
 
     typedef struct {
+        logic value;
+    } axi_mdio_regs__ctrl_reg__pre_dis__out_t;
+
+    typedef struct {
         axi_mdio_regs__ctrl_reg__go__out_t go;
         axi_mdio_regs__ctrl_reg__wr_nrd__out_t wr_nrd;
+        axi_mdio_regs__ctrl_reg__pre_dis__out_t pre_dis;
     } axi_mdio_regs__ctrl_reg__out_t;
 
     typedef struct {

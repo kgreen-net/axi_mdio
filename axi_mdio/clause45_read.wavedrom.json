@@ -1,0 +1,55 @@
+{
+  "head": {
+    "text": ["tspan", {"class": "h3"}, "Clause 45 MDIO — Complete Read Transaction (Address + Read Frames)"]
+  },
+  "config": { "hscale": 2 },
+  "signal": [
+    { "name": "MDC",
+      "wave": "0P...|..|..|...|...|..|........|.P...|..|..|...|...|..|........0",
+      "node": "..................................A.................................."},
+    {},
+
+    ["Frame 1: Address",
+      { "name": "MDIO_OE",
+        "wave": "01...|..|..|...|...|..|........|.....|..|..|...|...|..|........."},
+      { "name": "MDIO_OUT",
+        "wave": "x1...|00|00|3..|4..|10|5.......|.....|..|..|...|...|..|........x",
+        "data": ["P[4:0]","D[4:0]","ADDR[15:0]"] }
+    ],
+    {},
+
+    ["Frame 2: Read",
+      { "name": "MDIO_OE",
+        "wave": "0....|..|..|...|...|..|........|1....|..|..|...|...|0.|........0"},
+      { "name": "MDIO_OUT",
+        "wave": "x....|..|..|...|...|..|........|1....|00|11|3..|4..|z.|........x",
+        "data": ["P[4:0]","D[4:0]"] },
+      { "name": "MDIO_IN",
+        "wave": "x....|..|..|...|...|..|........|.....|..|..|...|...|.0|5......x",
+        "data": ["DATA_IN[15:0]"] }
+    ],
+    {},
+
+    { "name": "field",
+      "wave": "=....|==|==|=..|=..|==|=.......|=....|==|==|=..|=..|==|=.......",
+      "data": ["PRE","ST","00","OP","00","PRT","AD","DEV","AD","TA","10","REG_ADDR[15:0]",
+               "PRE","ST","00","OP","11","PRT","AD","DEV","AD","TA","Z0","DATA_IN[15:0]"] },
+
+    { "name": "bits",
+      "wave": "=....|==|==|=..|=..|==|=.......|=....|==|==|=..|=..|==|=.......",
+      "data": ["32","2","2","5","5","2","16","32","2","2","5","5","2","16"] },
+
+    { "name": "bus owner",
+      "wave": "2....|..|..|...|...|..|........|2....|..|..|...|...|2.|.........",
+      "data": ["STA drives","STA drives","PHY drives"] }
+  ],
+  "edge": ["A<->A idle"],
+  "foot": {
+    "text": ["tspan", {},
+      "STA drives on MDC falling edge. PHY data sampled on MDC rising edge.",
+      ["tspan", {"x": 0, "dy": 14}, "Frame 1: PRE(32) | ST(00) | OP(00) | PRTAD(5) | DEVAD(5) | TA(10) | ADDR(16)"],
+      ["tspan", {"x": 0, "dy": 14}, "Frame 2: PRE(32) | ST(00) | OP(11) | PRTAD(5) | DEVAD(5) | TA(Z0) | DATA(16)"],
+      ["tspan", {"x": 0, "dy": 14}, "Read TA: STA releases bus (Z), PHY drives 0 — violation sets error bit."]
+    ]
+  }
+}
