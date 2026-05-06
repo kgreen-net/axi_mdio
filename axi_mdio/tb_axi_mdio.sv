@@ -27,9 +27,9 @@ module tb_axi_mdio;
     logic        rst;
 
     logic        mdc;
-    logic        mdio_out;
+    logic        mdio_o;
     logic        mdio_t;
-    logic        mdio_in = 1'b1;
+    logic        mdio_i = 1'b1;
     logic        phy_rstn;
     logic        irq;
 
@@ -74,9 +74,9 @@ module tb_axi_mdio;
         .clk             (clk),
         .rst             (rst),
         .mdc             (mdc),
-        .mdio_out        (mdio_out),
+        .mdio_o        (mdio_o),
         .mdio_t          (mdio_t),
-        .mdio_in         (mdio_in),
+        .mdio_i         (mdio_i),
         .phy_rstn        (phy_rstn),
         .irq             (irq),
         .reg_axi_awready (reg_axi_awready),
@@ -222,7 +222,7 @@ module tb_axi_mdio;
     //  PHY Model — MDIO Responder
     // ================================================================
     // During a read transaction, after the controller asserts mdio_t
-    // for the TA+DATA phase, we drive mdio_in with TA=0 then a known
+    // for the TA+DATA phase, we drive mdio_i with TA=0 then a known
     // 16-bit value (phy_rd_data).
     // ================================================================
 
@@ -256,14 +256,14 @@ module tb_axi_mdio;
     // So a "short" OE-high period (< 32 edges) followed by OE-falling = read TA.
     int mdc_edges_in_oe = 0;
 
-    // PHY model: drive mdio_in on MDC falling edges so data is stable
+    // PHY model: drive mdio_i on MDC falling edges so data is stable
     // before the DUT samples on the next MDC rising edge.
     always @(posedge clk) begin
         if (rst) begin
             phy_state        <= PHY_IDLE;
             phy_bit_cnt      <= 0;
             phy_shift        <= '0;
-            mdio_in          <= 1'b1;
+            mdio_i          <= 1'b1;
             mdc_edges_in_oe  <= 0;
         end else begin
             // Track MDC rising edges during current OE-high period
@@ -285,7 +285,7 @@ module tb_axi_mdio;
                             phy_state   <= PHY_TA;
                             phy_bit_cnt <= 1;
                             phy_shift   <= phy_rd_data;
-                            mdio_in     <= 1'b1;
+                            mdio_i     <= 1'b1;
                         end
                     end
                 end
@@ -293,10 +293,10 @@ module tb_axi_mdio;
                 PHY_TA: begin
                     if (mdc_negedge_phy) begin
                         if (phy_bit_cnt == 1) begin
-                            mdio_in     <= 1'b0;
+                            mdio_i     <= 1'b0;
                             phy_bit_cnt <= 0;
                         end else begin
-                            mdio_in     <= phy_shift[15];
+                            mdio_i     <= phy_shift[15];
                             phy_shift   <= {phy_shift[14:0], 1'b0};
                             phy_bit_cnt <= 15;
                             phy_state   <= PHY_DATA;
@@ -307,10 +307,10 @@ module tb_axi_mdio;
                 PHY_DATA: begin
                     if (mdc_negedge_phy) begin
                         if (phy_bit_cnt == 0) begin
-                            mdio_in   <= 1'b1;
+                            mdio_i   <= 1'b1;
                             phy_state <= PHY_IDLE;
                         end else begin
-                            mdio_in     <= phy_shift[15];
+                            mdio_i     <= phy_shift[15];
                             phy_shift   <= {phy_shift[14:0], 1'b0};
                             phy_bit_cnt <= phy_bit_cnt - 1;
                         end
@@ -323,7 +323,7 @@ module tb_axi_mdio;
     end
 
     // ================================================================
-    //  Frame Capture — record mdio_out bits on MDC rising edges
+    //  Frame Capture — record mdio_o bits on MDC rising edges
     // ================================================================
     logic [127:0] captured_frame = '0;
     int           capture_idx = 0;
@@ -346,7 +346,7 @@ module tb_axi_mdio;
         end else if (capture_stop_req) begin
             capture_active <= 1'b0;
         end else if (capture_active && mdc_posedge_phy && !mdio_t) begin
-            captured_frame <= {captured_frame[126:0], mdio_out};
+            captured_frame <= {captured_frame[126:0], mdio_o};
             capture_idx    <= capture_idx + 1;
         end
     end
@@ -433,7 +433,7 @@ module tb_axi_mdio;
         stop_capture();
 
         // Verify we captured the expected number of OE-high bits.
-        // Due to MDC/OE alignment, the FSM drives mdio_out=1 on the IDLE→PRE
+        // Due to MDC/OE alignment, the FSM drives mdio_o=1 on the IDLE→PRE
         // transition before the first mdc_fall, and the last bit of each frame
         // may or may not be captured depending on when OE drops relative to mdc_rise.
         // We just check we got a reasonable count.
@@ -451,7 +451,7 @@ module tb_axi_mdio;
             // Frame 2 (write): PRE(32x1) + ST(00) + OP(01) + PRTAD(00001) + DEVAD(00011) + TA(10) + DATA(0x1234)
             expected_wr_frame = {32'hFFFF_FFFF, 2'b00, 2'b01, 5'b00001, 5'b00011, 2'b10, 16'h1234};
 
-            // The FSM drives 64 bits per frame, but the very first mdio_out=1 before
+            // The FSM drives 64 bits per frame, but the very first mdio_o=1 before
             // the shift register starts clocking adds an extra bit. Also the last bit
             // of each frame may be lost when OE drops. Let's check what we got.
             $display("  Full capture[127:0] : %0128b", captured_frame);

@@ -27,14 +27,14 @@ A complete Clause 45 transaction consists of two 64-bit MDIO frames: an address 
 
 ## MDIO Physical Interface
 
-The MDIO bus uses separate out/t/in signals (FPGA tri-state convention). The top-level IOB handles tri-state: `assign mdio = mdio_t ? 1'bz : mdio_out;`
+The MDIO bus uses separate out/t/in signals (FPGA tri-state convention). The top-level IOB handles tri-state: `assign mdio = mdio_t ? 1'bz : mdio_o;`
 
 | Name     | Width | Direction | Description                                |
 |----------|-------|-----------|--------------------------------------------|
 | mdc      | 1     | output    | MDIO clock (gated, only during TX)         |
-| mdio_out | 1     | output    | MDIO data output                           |
+| mdio_o | 1     | output    | MDIO data output                           |
 | mdio_t   | 1     | output    | MDIO tri-state control (1 = high impedance)|
-| mdio_in  | 1     | input     | MDIO data input from PHY                   |
+| mdio_i  | 1     | input     | MDIO data input from PHY                   |
 | phy_rstn | 1     | output    | PHY reset, active low (register-controlled) |
 
 ## Interrupt

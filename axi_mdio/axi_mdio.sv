@@ -7,9 +7,9 @@ module axi_mdio #(
 
     // ── MDIO Physical Interface ───────────────────────────────────────
     output logic        mdc,
-    output logic        mdio_out,
+    output logic        mdio_o,
     output logic        mdio_t,
-    input  logic        mdio_in,
+    input  logic        mdio_i,
 
     // ── PHY Reset ────────────────────────────────────────────────────
     output logic        phy_rstn,
@@ -327,17 +327,17 @@ module axi_mdio #(
                         mdc_en      <= 1'b0;
                         if (is_write) begin
                             // Output last write data bit
-                            mdio_out  <= shift_reg[31];
+                            mdio_o  <= shift_reg[31];
                             shift_reg <= {shift_reg[30:0], 1'b0};
                         end else begin
                             // Capture last read data bit
-                            captured_rddata <= {captured_rddata[14:0], mdio_in};
+                            captured_rddata <= {captured_rddata[14:0], mdio_i};
                             status_error    <= ta_error;
                         end
                     end else begin
                         // Steady-state idle
                         mdio_t      <= 1'b1;
-                        mdio_out    <= 1'b1;
+                        mdio_o    <= 1'b1;
                         mdc_en      <= 1'b0;
                         status_busy <= 1'b0;
                     end
@@ -354,11 +354,11 @@ module axi_mdio #(
                         shift_reg   <= 32'hFFFF_FFFF;
                         bit_cnt     <= 6'd31;
                         mdio_t      <= 1'b0;
-                        mdio_out    <= 1'b1;
+                        mdio_o    <= 1'b1;
                         mdc_en      <= 1'b1;
                     end else if (mdc_fall) begin
                         // Shifting preamble
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -373,16 +373,16 @@ module axi_mdio #(
                         status_busy <= 1'b1;
                         mdc_en      <= 1'b1;
                         mdio_t      <= 1'b0;
-                        mdio_out    <= 1'b0;
+                        mdio_o    <= 1'b0;
                         shift_reg   <= {2'b00, 30'd0};
                         bit_cnt     <= 6'd1;
                     end else if (state == ST_ADDR_PRE) begin
                         // Entry: output last preamble bit, load ST = 2'b00
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {2'b00, 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -391,11 +391,11 @@ module axi_mdio #(
                 ST_ADDR_OP: begin
                     if (state == ST_ADDR_ST) begin
                         // Entry: output last ST bit, load OP = 2'b00 (address)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {2'b00, 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -404,11 +404,11 @@ module axi_mdio #(
                 ST_ADDR_PRTAD: begin
                     if (state == ST_ADDR_OP) begin
                         // Entry: output last OP bit, load PRTAD (5 bits)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {ctrl_prtad, 27'd0};
                         bit_cnt   <= 6'd4;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -417,11 +417,11 @@ module axi_mdio #(
                 ST_ADDR_DEVAD: begin
                     if (state == ST_ADDR_PRTAD) begin
                         // Entry: output last PRTAD bit, load DEVAD (5 bits)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {ctrl_devad, 27'd0};
                         bit_cnt   <= 6'd4;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -430,11 +430,11 @@ module axi_mdio #(
                 ST_ADDR_TA: begin
                     if (state == ST_ADDR_DEVAD) begin
                         // Entry: output last DEVAD bit, load TA = 2'b10
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {2'b10, 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -443,11 +443,11 @@ module axi_mdio #(
                 ST_ADDR_DATA: begin
                     if (state == ST_ADDR_TA) begin
                         // Entry: output last TA bit, load REG_ADDR (16 bits)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {ctrl_reg_addr, 16'd0};
                         bit_cnt   <= 6'd15;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -457,7 +457,7 @@ module axi_mdio #(
                 ST_TURNAROUND: begin
                     if (state == ST_ADDR_DATA) begin
                         // Entry: output last addr data bit, release bus
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         mdio_t    <= 1'b1;
                     end
@@ -471,9 +471,9 @@ module axi_mdio #(
                         shift_reg <= 32'hFFFF_FFFF;
                         bit_cnt   <= 6'd31;
                         mdio_t    <= 1'b0;
-                        mdio_out  <= 1'b1;
+                        mdio_o  <= 1'b1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -483,16 +483,16 @@ module axi_mdio #(
                     if (state == ST_TURNAROUND) begin
                         // Entry (preamble disabled): load ST = 2'b00
                         mdio_t    <= 1'b0;
-                        mdio_out  <= 1'b0;
+                        mdio_o  <= 1'b0;
                         shift_reg <= {2'b00, 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (state == ST_RW_PRE) begin
                         // Entry: output last preamble bit, load ST = 2'b00
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {2'b00, 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -501,11 +501,11 @@ module axi_mdio #(
                 ST_RW_OP: begin
                     if (state == ST_RW_ST) begin
                         // Entry: output last ST bit, load OP
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {(is_write ? 2'b01 : 2'b11), 30'd0};
                         bit_cnt   <= 6'd1;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -514,11 +514,11 @@ module axi_mdio #(
                 ST_RW_PRTAD: begin
                     if (state == ST_RW_OP) begin
                         // Entry: output last OP bit, load PRTAD (5 bits)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {ctrl_prtad, 27'd0};
                         bit_cnt   <= 6'd4;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -527,11 +527,11 @@ module axi_mdio #(
                 ST_RW_DEVAD: begin
                     if (state == ST_RW_PRTAD) begin
                         // Entry: output last PRTAD bit, load DEVAD (5 bits)
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {ctrl_devad, 27'd0};
                         bit_cnt   <= 6'd4;
                     end else if (mdc_fall) begin
-                        mdio_out  <= shift_reg[31];
+                        mdio_o  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
                         bit_cnt   <= bit_cnt - 1;
                     end
@@ -540,7 +540,7 @@ module axi_mdio #(
                 ST_RW_TA: begin
                     if (state == ST_RW_DEVAD) begin
                         // Entry: output last DEVAD bit, set up TA
-                        mdio_out <= shift_reg[31];
+                        mdio_o <= shift_reg[31];
                         if (is_write) begin
                             // Write TA = 2'b10, we drive
                             shift_reg <= {2'b10, 30'd0};
@@ -555,7 +555,7 @@ module axi_mdio #(
                     end else if (is_write) begin
                         // Write TA: shift out 1 then 0
                         if (mdc_fall) begin
-                            mdio_out  <= shift_reg[31];
+                            mdio_o  <= shift_reg[31];
                             shift_reg <= {shift_reg[30:0], 1'b0};
                             bit_cnt   <= bit_cnt - 1;
                         end
@@ -571,26 +571,26 @@ module axi_mdio #(
                         // Entry from TA phase
                         if (is_write) begin
                             // Output last TA bit, load write data (16 bits)
-                            mdio_out  <= shift_reg[31];
+                            mdio_o  <= shift_reg[31];
                             shift_reg <= {ctrl_wrdata, 16'd0};
                             bit_cnt   <= 6'd15;
                         end else begin
                             // Second TA bit — PHY should drive 0
-                            if (mdio_in != 1'b0)
+                            if (mdio_i != 1'b0)
                                 ta_error <= 1'b1;
                             bit_cnt <= 6'd15;
                         end
                     end else if (is_write) begin
                         // Write: shift out data on falling edge
                         if (mdc_fall) begin
-                            mdio_out  <= shift_reg[31];
+                            mdio_o  <= shift_reg[31];
                             shift_reg <= {shift_reg[30:0], 1'b0};
                             bit_cnt   <= bit_cnt - 1;
                         end
                     end else begin
                         // Read: shift in data on rising edge
                         if (mdc_rise) begin
-                            captured_rddata <= {captured_rddata[14:0], mdio_in};
+                            captured_rddata <= {captured_rddata[14:0], mdio_i};
                             bit_cnt         <= bit_cnt - 1;
                         end
                     end
