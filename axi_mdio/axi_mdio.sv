@@ -8,7 +8,7 @@ module axi_mdio #(
     // ── MDIO Physical Interface ───────────────────────────────────────
     output logic        mdc,
     output logic        mdio_out,
-    output logic        mdio_oe,
+    output logic        mdio_t,
     input  logic        mdio_in,
 
     // ── PHY Reset ────────────────────────────────────────────────────
@@ -323,7 +323,7 @@ module axi_mdio #(
                         // Transaction completing
                         status_busy <= 1'b0;
                         status_done <= 1'b1;
-                        mdio_oe     <= 1'b0;
+                        mdio_t      <= 1'b1;
                         mdc_en      <= 1'b0;
                         if (is_write) begin
                             // Output last write data bit
@@ -336,7 +336,7 @@ module axi_mdio #(
                         end
                     end else begin
                         // Steady-state idle
-                        mdio_oe     <= 1'b0;
+                        mdio_t      <= 1'b1;
                         mdio_out    <= 1'b1;
                         mdc_en      <= 1'b0;
                         status_busy <= 1'b0;
@@ -353,7 +353,7 @@ module axi_mdio #(
                         status_busy <= 1'b1;
                         shift_reg   <= 32'hFFFF_FFFF;
                         bit_cnt     <= 6'd31;
-                        mdio_oe     <= 1'b1;
+                        mdio_t      <= 1'b0;
                         mdio_out    <= 1'b1;
                         mdc_en      <= 1'b1;
                     end else if (mdc_fall) begin
@@ -372,7 +372,7 @@ module axi_mdio #(
                         ta_error    <= 1'b0;
                         status_busy <= 1'b1;
                         mdc_en      <= 1'b1;
-                        mdio_oe     <= 1'b1;
+                        mdio_t      <= 1'b0;
                         mdio_out    <= 1'b0;
                         shift_reg   <= {2'b00, 30'd0};
                         bit_cnt     <= 6'd1;
@@ -459,7 +459,7 @@ module axi_mdio #(
                         // Entry: output last addr data bit, release bus
                         mdio_out  <= shift_reg[31];
                         shift_reg <= {shift_reg[30:0], 1'b0};
-                        mdio_oe   <= 1'b0;
+                        mdio_t    <= 1'b1;
                     end
                     // Steady-state: wait for mdc_fall (no outputs to drive)
                 end
@@ -470,7 +470,7 @@ module axi_mdio #(
                         // Entry: load preamble for frame 2 (32 ones)
                         shift_reg <= 32'hFFFF_FFFF;
                         bit_cnt   <= 6'd31;
-                        mdio_oe   <= 1'b1;
+                        mdio_t    <= 1'b0;
                         mdio_out  <= 1'b1;
                     end else if (mdc_fall) begin
                         mdio_out  <= shift_reg[31];
@@ -482,7 +482,7 @@ module axi_mdio #(
                 ST_RW_ST: begin
                     if (state == ST_TURNAROUND) begin
                         // Entry (preamble disabled): load ST = 2'b00
-                        mdio_oe   <= 1'b1;
+                        mdio_t    <= 1'b0;
                         mdio_out  <= 1'b0;
                         shift_reg <= {2'b00, 30'd0};
                         bit_cnt   <= 6'd1;
@@ -545,12 +545,12 @@ module axi_mdio #(
                             // Write TA = 2'b10, we drive
                             shift_reg <= {2'b10, 30'd0};
                             bit_cnt   <= 6'd1;
-                            mdio_oe   <= 1'b1;
+                            mdio_t    <= 1'b0;
                         end else begin
                             // Read TA: release bus, PHY drives
                             shift_reg <= '0;
                             bit_cnt   <= 6'd1;
-                            mdio_oe   <= 1'b0;
+                            mdio_t    <= 1'b1;
                         end
                     end else if (is_write) begin
                         // Write TA: shift out 1 then 0

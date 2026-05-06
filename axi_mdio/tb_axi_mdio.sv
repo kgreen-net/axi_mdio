@@ -28,7 +28,7 @@ module tb_axi_mdio;
 
     logic        mdc;
     logic        mdio_out;
-    logic        mdio_oe;
+    logic        mdio_t;
     logic        mdio_in = 1'b1;
     logic        phy_rstn;
     logic        irq;
@@ -75,7 +75,7 @@ module tb_axi_mdio;
         .rst             (rst),
         .mdc             (mdc),
         .mdio_out        (mdio_out),
-        .mdio_oe         (mdio_oe),
+        .mdio_t          (mdio_t),
         .mdio_in         (mdio_in),
         .phy_rstn        (phy_rstn),
         .irq             (irq),
@@ -221,7 +221,7 @@ module tb_axi_mdio;
     // ================================================================
     //  PHY Model — MDIO Responder
     // ================================================================
-    // During a read transaction, after the controller releases mdio_oe
+    // During a read transaction, after the controller asserts mdio_t
     // for the TA+DATA phase, we drive mdio_in with TA=0 then a known
     // 16-bit value (phy_rd_data).
     // ================================================================
@@ -246,9 +246,9 @@ module tb_axi_mdio;
     logic [15:0] phy_shift = '0;
 
     // Detect OE falling edge (controller releases bus)
-    logic mdio_oe_r1;
-    always @(posedge clk) mdio_oe_r1 <= mdio_oe;
-    wire oe_falling = mdio_oe_r1 && !mdio_oe;
+    logic mdio_t_r1;
+    always @(posedge clk) mdio_t_r1 <= mdio_t;
+    wire t_rising = !mdio_t_r1 && mdio_t;
 
     // Count MDC rising edges while OE is high in the current OE-high period.
     // Address frame and write frame: OE high for ~65 edges (64 data + initial).
@@ -267,11 +267,11 @@ module tb_axi_mdio;
             mdc_edges_in_oe  <= 0;
         end else begin
             // Track MDC rising edges during current OE-high period
-            if (mdio_oe && mdc_posedge_phy) begin
+            if (!mdio_t && mdc_posedge_phy) begin
                 mdc_edges_in_oe <= mdc_edges_in_oe + 1;
             end
             // Reset edge counter on OE rising edge (new OE-high period)
-            if (!mdio_oe_r1 && mdio_oe) begin
+            if (mdio_t_r1 && !mdio_t) begin
                 mdc_edges_in_oe <= 0;
             end
 
@@ -280,7 +280,7 @@ module tb_axi_mdio;
                     // Respond when OE drops after a "short" OE-high period (10-50 MDC
                     // edges), indicating a read TA phase. Full frames (addr/write) have
                     // ~64 edges with OE high.
-                    if (oe_falling) begin
+                    if (t_rising) begin
                         if (mdc_edges_in_oe > 10 && mdc_edges_in_oe < 50) begin
                             phy_state   <= PHY_TA;
                             phy_bit_cnt <= 1;
@@ -345,7 +345,7 @@ module tb_axi_mdio;
             capture_active <= 1'b1;
         end else if (capture_stop_req) begin
             capture_active <= 1'b0;
-        end else if (capture_active && mdc_posedge_phy && mdio_oe) begin
+        end else if (capture_active && mdc_posedge_phy && !mdio_t) begin
             captured_frame <= {captured_frame[126:0], mdio_out};
             capture_idx    <= capture_idx + 1;
         end
@@ -397,7 +397,7 @@ module tb_axi_mdio;
 
         // Verify post-reset state
         check_bit("mdc after reset", mdc, 1'b0);
-        check_bit("mdio_oe after reset", mdio_oe, 1'b0);
+        check_bit("mdio_t after reset", mdio_t, 1'b1);
         check_bit("irq after reset", irq, 1'b0);
 
         // Read STATUS — should be 0
