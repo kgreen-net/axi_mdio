@@ -10,14 +10,15 @@ module tb_axi_mdio;
     localparam int CLK_PERIOD  = 10;             // 100 MHz
 
     // Register addresses (byte offsets)
-    localparam logic [4:0] ADDR_CTRL       = 5'h00;
-    localparam logic [4:0] ADDR_PHY_ADDR   = 5'h04;
-    localparam logic [4:0] ADDR_REG_ADDR   = 5'h08;
-    localparam logic [4:0] ADDR_WRDATA     = 5'h0C;
-    localparam logic [4:0] ADDR_RDDATA     = 5'h10;
-    localparam logic [4:0] ADDR_STATUS     = 5'h14;
-    localparam logic [4:0] ADDR_IRQ_STATUS = 5'h18;
-    localparam logic [4:0] ADDR_IRQ_EN     = 5'h1C;
+    localparam logic [5:0] ADDR_CTRL       = 6'h00;
+    localparam logic [5:0] ADDR_PHY_ADDR   = 6'h04;
+    localparam logic [5:0] ADDR_REG_ADDR   = 6'h08;
+    localparam logic [5:0] ADDR_WRDATA     = 6'h0C;
+    localparam logic [5:0] ADDR_RDDATA     = 6'h10;
+    localparam logic [5:0] ADDR_STATUS     = 6'h14;
+    localparam logic [5:0] ADDR_IRQ_STATUS = 6'h18;
+    localparam logic [5:0] ADDR_IRQ_EN     = 6'h1C;
+    localparam logic [5:0] ADDR_PHY_RST    = 6'h20;
 
     // ================================================================
     //  Signals
@@ -29,12 +30,13 @@ module tb_axi_mdio;
     logic        mdio_out;
     logic        mdio_oe;
     logic        mdio_in = 1'b1;
+    logic        phy_rstn;
     logic        irq;
 
     // AXI4-Lite
     logic        reg_axi_awready;
     logic        reg_axi_awvalid;
-    logic [4:0]  reg_axi_awaddr;
+    logic [5:0]  reg_axi_awaddr;
     logic [2:0]  reg_axi_awprot;
 
     logic        reg_axi_wready;
@@ -48,7 +50,7 @@ module tb_axi_mdio;
 
     logic        reg_axi_arready;
     logic        reg_axi_arvalid;
-    logic [4:0]  reg_axi_araddr;
+    logic [5:0]  reg_axi_araddr;
     logic [2:0]  reg_axi_arprot;
 
     logic        reg_axi_rready;
@@ -75,6 +77,7 @@ module tb_axi_mdio;
         .mdio_out        (mdio_out),
         .mdio_oe         (mdio_oe),
         .mdio_in         (mdio_in),
+        .phy_rstn        (phy_rstn),
         .irq             (irq),
         .reg_axi_awready (reg_axi_awready),
         .reg_axi_awvalid (reg_axi_awvalid),
@@ -127,7 +130,7 @@ module tb_axi_mdio;
     //  AXI4-Lite Driver Tasks
     // ================================================================
 
-    task axi_write(input logic [4:0] addr, input logic [31:0] data);
+    task axi_write(input logic [5:0] addr, input logic [31:0] data);
         // Drive AW and W channels simultaneously
         @(posedge clk);
         reg_axi_awvalid <= 1'b1;
@@ -170,7 +173,7 @@ module tb_axi_mdio;
         end
     endtask
 
-    task axi_read(input logic [4:0] addr, output logic [31:0] rdata);
+    task axi_read(input logic [5:0] addr, output logic [31:0] rdata);
         @(posedge clk);
         reg_axi_arvalid <= 1'b1;
         reg_axi_araddr  <= addr;

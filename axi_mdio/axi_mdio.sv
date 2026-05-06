@@ -11,14 +11,17 @@ module axi_mdio #(
     output logic        mdio_oe,
     input  logic        mdio_in,
 
+    // ── PHY Reset ────────────────────────────────────────────────────
+    output logic        phy_rstn,
+
     // ── Interrupt ─────────────────────────────────────────────────────
     output logic        irq,
 
-    // ── Register Interface (AXI4-Lite subordinate, 5-bit addr) ────────
+    // ── Register Interface (AXI4-Lite subordinate, 6-bit addr) ────────
     // Write Address
     output logic        reg_axi_awready,
     input  logic        reg_axi_awvalid,
-    input  logic [4:0]  reg_axi_awaddr,
+    input  logic [5:0]  reg_axi_awaddr,
     input  logic [2:0]  reg_axi_awprot,
 
     // Write Data
@@ -35,7 +38,7 @@ module axi_mdio #(
     // Read Address
     output logic        reg_axi_arready,
     input  logic        reg_axi_arvalid,
-    input  logic [4:0]  reg_axi_araddr,
+    input  logic [5:0]  reg_axi_araddr,
     input  logic [2:0]  reg_axi_arprot,
 
     // Read Data
@@ -111,6 +114,7 @@ module axi_mdio #(
     assign ctrl_devad    = regs_hwif_out.PHY_ADDR.devad.value;
     assign ctrl_reg_addr = regs_hwif_out.REG_ADDR.addr.value;
     assign ctrl_wrdata   = regs_hwif_out.WRDATA.data.value;
+    assign phy_rstn      = regs_hwif_out.PHY_RST.rstn.value;
 
     // Connect internal status signals → hwif_in
     assign regs_hwif_in.RDDATA.data.next       = captured_rddata;

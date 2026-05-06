@@ -4,8 +4,8 @@
 package axi_mdio_regs_pkg;
 
     localparam AXI_MDIO_REGS_DATA_WIDTH = 32;
-    localparam AXI_MDIO_REGS_MIN_ADDR_WIDTH = 5;
-    localparam AXI_MDIO_REGS_SIZE = 'h20;
+    localparam AXI_MDIO_REGS_MIN_ADDR_WIDTH = 6;
+    localparam AXI_MDIO_REGS_SIZE = 'h24;
 
     typedef struct {
         logic [15:0] next;
@@ -139,6 +139,14 @@ package axi_mdio_regs_pkg;
     } axi_mdio_regs__irq_en_reg__out_t;
 
     typedef struct {
+        logic value;
+    } axi_mdio_regs__phy_rst_reg__rstn__out_t;
+
+    typedef struct {
+        axi_mdio_regs__phy_rst_reg__rstn__out_t rstn;
+    } axi_mdio_regs__phy_rst_reg__out_t;
+
+    typedef struct {
         axi_mdio_regs__ctrl_reg__out_t CTRL;
         axi_mdio_regs__phy_addr_reg__out_t PHY_ADDR;
         axi_mdio_regs__reg_addr_reg__out_t REG_ADDR;
@@ -146,5 +154,6 @@ package axi_mdio_regs_pkg;
         axi_mdio_regs__status_reg__out_t STATUS;
         axi_mdio_regs__irq_status_reg__out_t IRQ_STATUS;
         axi_mdio_regs__irq_en_reg__out_t IRQ_EN;
+        axi_mdio_regs__phy_rst_reg__out_t PHY_RST;
     } axi_mdio_regs__out_t;
 endpackage

@@ -7,7 +7,7 @@ module axi_mdio_regs (
 
         output logic s_axil_awready,
         input wire s_axil_awvalid,
-        input wire [4:0] s_axil_awaddr,
+        input wire [5:0] s_axil_awaddr,
         input wire [2:0] s_axil_awprot,
         output logic s_axil_wready,
         input wire s_axil_wvalid,
@@ -18,7 +18,7 @@ module axi_mdio_regs (
         output logic [1:0] s_axil_bresp,
         output logic s_axil_arready,
         input wire s_axil_arvalid,
-        input wire [4:0] s_axil_araddr,
+        input wire [5:0] s_axil_araddr,
         input wire [2:0] s_axil_arprot,
         input wire s_axil_rready,
         output logic s_axil_rvalid,
@@ -34,7 +34,7 @@ module axi_mdio_regs (
     //--------------------------------------------------------------------------
     logic cpuif_req;
     logic cpuif_req_is_wr;
-    logic [4:0] cpuif_addr;
+    logic [5:0] cpuif_addr;
     logic [31:0] cpuif_wr_data;
     logic [31:0] cpuif_wr_biten;
     logic cpuif_req_stall_wr;
@@ -51,10 +51,10 @@ module axi_mdio_regs (
     logic [1:0] axil_n_in_flight;
     logic axil_prev_was_rd;
     logic axil_arvalid;
-    logic [4:0] axil_araddr;
+    logic [5:0] axil_araddr;
     logic axil_ar_accept;
     logic axil_awvalid;
-    logic [4:0] axil_awaddr;
+    logic [5:0] axil_awaddr;
     logic axil_wvalid;
     logic [31:0] axil_wdata;
     logic [3:0] axil_wstrb;
@@ -132,17 +132,17 @@ module axi_mdio_regs (
             if(axil_arvalid && !axil_prev_was_rd) begin
                 cpuif_req = '1;
                 cpuif_req_is_wr = '0;
-                cpuif_addr = {axil_araddr[4:2], 2'b0};
+                cpuif_addr = {axil_araddr[5:2], 2'b0};
                 if(!cpuif_req_stall_rd) axil_ar_accept = '1;
             end else if(axil_awvalid && axil_wvalid) begin
                 cpuif_req = '1;
                 cpuif_req_is_wr = '1;
-                cpuif_addr = {axil_awaddr[4:2], 2'b0};
+                cpuif_addr = {axil_awaddr[5:2], 2'b0};
                 if(!cpuif_req_stall_wr) axil_aw_accept = '1;
             end else if(axil_arvalid) begin
                 cpuif_req = '1;
                 cpuif_req_is_wr = '0;
-                cpuif_addr = {axil_araddr[4:2], 2'b0};
+                cpuif_addr = {axil_araddr[5:2], 2'b0};
                 if(!cpuif_req_stall_rd) axil_ar_accept = '1;
             end
         end
@@ -235,6 +235,7 @@ module axi_mdio_regs (
         logic STATUS;
         logic IRQ_STATUS;
         logic IRQ_EN;
+        logic PHY_RST;
     } decoded_reg_strb_t;
     decoded_reg_strb_t decoded_reg_strb;
     logic decoded_err;
@@ -248,22 +249,24 @@ module axi_mdio_regs (
         automatic logic is_invalid_rw;
         is_valid_addr = '0;
         is_invalid_rw = '0;
-        decoded_reg_strb.CTRL = cpuif_req_masked & (cpuif_addr == 5'h0);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h0);
-        decoded_reg_strb.PHY_ADDR = cpuif_req_masked & (cpuif_addr == 5'h4);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h4);
-        decoded_reg_strb.REG_ADDR = cpuif_req_masked & (cpuif_addr == 5'h8);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h8);
-        decoded_reg_strb.WRDATA = cpuif_req_masked & (cpuif_addr == 5'hc);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'hc);
-        decoded_reg_strb.RDDATA = cpuif_req_masked & (cpuif_addr == 5'h10) & !cpuif_req_is_wr;
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h10);
-        decoded_reg_strb.STATUS = cpuif_req_masked & (cpuif_addr == 5'h14) & !cpuif_req_is_wr;
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h14);
-        decoded_reg_strb.IRQ_STATUS = cpuif_req_masked & (cpuif_addr == 5'h18);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h18);
-        decoded_reg_strb.IRQ_EN = cpuif_req_masked & (cpuif_addr == 5'h1c);
-        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 5'h1c);
+        decoded_reg_strb.CTRL = cpuif_req_masked & (cpuif_addr == 6'h0);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h0);
+        decoded_reg_strb.PHY_ADDR = cpuif_req_masked & (cpuif_addr == 6'h4);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h4);
+        decoded_reg_strb.REG_ADDR = cpuif_req_masked & (cpuif_addr == 6'h8);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h8);
+        decoded_reg_strb.WRDATA = cpuif_req_masked & (cpuif_addr == 6'hc);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'hc);
+        decoded_reg_strb.RDDATA = cpuif_req_masked & (cpuif_addr == 6'h10) & !cpuif_req_is_wr;
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h10);
+        decoded_reg_strb.STATUS = cpuif_req_masked & (cpuif_addr == 6'h14) & !cpuif_req_is_wr;
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h14);
+        decoded_reg_strb.IRQ_STATUS = cpuif_req_masked & (cpuif_addr == 6'h18);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h18);
+        decoded_reg_strb.IRQ_EN = cpuif_req_masked & (cpuif_addr == 6'h1c);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h1c);
+        decoded_reg_strb.PHY_RST = cpuif_req_masked & (cpuif_addr == 6'h20);
+        is_valid_addr |= cpuif_req_masked & (cpuif_addr == 6'h20);
         decoded_err = (~is_valid_addr | is_invalid_rw) & decoded_req;
     end
 
@@ -343,6 +346,12 @@ module axi_mdio_regs (
                 logic load_next;
             } error_en;
         } IRQ_EN;
+        struct {
+            struct {
+                logic next;
+                logic load_next;
+            } rstn;
+        } PHY_RST;
     } field_combo_t;
     field_combo_t field_combo;
 
@@ -400,6 +409,11 @@ module axi_mdio_regs (
                 logic value;
             } error_en;
         } IRQ_EN;
+        struct {
+            struct {
+                logic value;
+            } rstn;
+        } PHY_RST;
     } field_storage_t;
     field_storage_t field_storage;
 
@@ -717,6 +731,29 @@ module axi_mdio_regs (
         end
     end
     assign hwif_out.IRQ_EN.error_en.value = field_storage.IRQ_EN.error_en.value;
+    // Field: axi_mdio_regs.PHY_RST.rstn
+    always_comb begin
+        automatic logic [0:0] next_c;
+        automatic logic load_next_c;
+        next_c = field_storage.PHY_RST.rstn.value;
+        load_next_c = '0;
+        if(decoded_reg_strb.PHY_RST && decoded_req_is_wr) begin // SW write
+            next_c = (field_storage.PHY_RST.rstn.value & ~decoded_wr_biten[0:0]) | (decoded_wr_data[0:0] & decoded_wr_biten[0:0]);
+            load_next_c = '1;
+        end
+        field_combo.PHY_RST.rstn.next = next_c;
+        field_combo.PHY_RST.rstn.load_next = load_next_c;
+    end
+    always_ff @(posedge clk) begin
+        if(rst) begin
+            field_storage.PHY_RST.rstn.value <= 1'h0;
+        end else begin
+            if(field_combo.PHY_RST.rstn.load_next) begin
+                field_storage.PHY_RST.rstn.value <= field_combo.PHY_RST.rstn.next;
+            end
+        end
+    end
+    assign hwif_out.PHY_RST.rstn.value = field_storage.PHY_RST.rstn.value;
 
     //--------------------------------------------------------------------------
     // Write response
@@ -734,7 +771,7 @@ module axi_mdio_regs (
     logic [31:0] readback_data;
 
     // Assign readback values to a flattened array
-    logic [31:0] readback_array[8];
+    logic [31:0] readback_array[9];
     assign readback_array[0][0:0] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.go.value : '0;
     assign readback_array[0][1:1] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.wr_nrd.value : '0;
     assign readback_array[0][2:2] = (decoded_reg_strb.CTRL && !decoded_req_is_wr) ? field_storage.CTRL.pre_dis.value : '0;
@@ -759,6 +796,8 @@ module axi_mdio_regs (
     assign readback_array[7][0:0] = (decoded_reg_strb.IRQ_EN && !decoded_req_is_wr) ? field_storage.IRQ_EN.done_en.value : '0;
     assign readback_array[7][1:1] = (decoded_reg_strb.IRQ_EN && !decoded_req_is_wr) ? field_storage.IRQ_EN.error_en.value : '0;
     assign readback_array[7][31:2] = '0;
+    assign readback_array[8][0:0] = (decoded_reg_strb.PHY_RST && !decoded_req_is_wr) ? field_storage.PHY_RST.rstn.value : '0;
+    assign readback_array[8][31:1] = '0;
 
     // Reduce the array
     always_comb begin
@@ -766,7 +805,7 @@ module axi_mdio_regs (
         readback_done = decoded_req & ~decoded_req_is_wr;
         readback_err = decoded_err;
         readback_data_var = '0;
-        for(int i=0; i<8; i++) readback_data_var |= readback_array[i];
+        for(int i=0; i<9; i++) readback_data_var |= readback_array[i];
         readback_data = readback_data_var;
     end
 

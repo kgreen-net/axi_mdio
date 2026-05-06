@@ -35,6 +35,7 @@ The MDIO bus uses separate out/oe/in signals (FPGA tri-state convention). The to
 | mdio_out | 1     | output    | MDIO data output                   |
 | mdio_oe  | 1     | output    | MDIO output enable (active high)   |
 | mdio_in  | 1     | input     | MDIO data input from PHY           |
+| phy_rstn | 1     | output    | PHY reset, active low (register-controlled) |
 
 ## Interrupt
 
@@ -44,7 +45,7 @@ The MDIO bus uses separate out/oe/in signals (FPGA tri-state convention). The to
 
 ## Register Interface
 
-The register interface is an AXI4-Lite subordinate interface (`reg_axi_*` prefix) that provides software access to control and status registers. It uses 32-bit data with a 5-bit address bus (32 bytes of address space).
+The register interface is an AXI4-Lite subordinate interface (`reg_axi_*` prefix) that provides software access to control and status registers. It uses 32-bit data with a 6-bit address bus (64 bytes of address space).
 
 ### Register Interface Ports
 
@@ -52,7 +53,7 @@ The register interface is an AXI4-Lite subordinate interface (`reg_axi_*` prefix
 |-------------------|-------|-----------|--------------------------|
 | reg_axi_awready   | 1     | output    | Write address ready      |
 | reg_axi_awvalid   | 1     | input     | Write address valid      |
-| reg_axi_awaddr    | 5     | input     | Write address            |
+| reg_axi_awaddr    | 6     | input     | Write address            |
 | reg_axi_awprot    | 3     | input     | Write protection type    |
 | reg_axi_wready    | 1     | output    | Write data ready         |
 | reg_axi_wvalid    | 1     | input     | Write data valid         |
@@ -63,7 +64,7 @@ The register interface is an AXI4-Lite subordinate interface (`reg_axi_*` prefix
 | reg_axi_bresp     | 2     | output    | Write response           |
 | reg_axi_arready   | 1     | output    | Read address ready       |
 | reg_axi_arvalid   | 1     | input     | Read address valid       |
-| reg_axi_araddr    | 5     | input     | Read address             |
+| reg_axi_araddr    | 6     | input     | Read address             |
 | reg_axi_arprot    | 3     | input     | Read protection type     |
 | reg_axi_rready    | 1     | input     | Read data ready          |
 | reg_axi_rvalid    | 1     | output    | Read data valid          |
@@ -96,6 +97,7 @@ All registers are 32-bit, byte-addressed, 4-byte aligned.
 | 0x14   | STATUS   | RO  | [0] busy, [1] done, [2] error     | Bit 0: transaction in progress. Bit 1: done (latched, cleared on read). Bit 2: TA error (latched, cleared on read). |
 | 0x18   | IRQ_STATUS | R/W | [0] done, [1] error              | Latched interrupt status. Write 1 to a bit to clear it (W1C).                                                        |
 | 0x1C   | IRQ_EN   | R/W | [0] done_en, [1] error_en         | Interrupt enable mask. `irq` output = `|(IRQ_STATUS & IRQ_EN)`. Level-sensitive; clears when SW writes 1 to IRQ_STATUS. |
+| 0x20   | PHY_RST  | R/W | [0] rstn                          | PHY reset control. Directly drives `phy_rstn` output. Defaults to 0 (PHY held in reset). Write 1 to release reset.     |
 
 Accesses to undefined register offsets return DECERR.
 

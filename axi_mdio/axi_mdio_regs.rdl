@@ -70,6 +70,10 @@ addrmap axi_mdio_regs {
         field {} error_en[1] = 0;
     };
 
+    reg phy_rst_reg {
+        field {} rstn[1] = 0;
+    };
+
     ctrl_reg       CTRL       @ 0x00;
     phy_addr_reg   PHY_ADDR   @ 0x04;
     reg_addr_reg   REG_ADDR   @ 0x08;
@@ -78,4 +82,5 @@ addrmap axi_mdio_regs {
     status_reg     STATUS     @ 0x14;
     irq_status_reg IRQ_STATUS @ 0x18;
     irq_en_reg     IRQ_EN     @ 0x1C;
+    phy_rst_reg    PHY_RST    @ 0x20;
 };
