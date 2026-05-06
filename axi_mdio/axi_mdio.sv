@@ -170,7 +170,7 @@ module axi_mdio #(
     //  MDIO Clause 45 FSM
     // =====================================================================
 
-    typedef enum logic [3:0] {
+    typedef enum logic [4:0] {
         ST_IDLE,
         ST_ADDR_PRE,
         ST_ADDR_ST,
@@ -186,7 +186,8 @@ module axi_mdio #(
         ST_RW_PRTAD,
         ST_RW_DEVAD,
         ST_RW_TA,
-        ST_RW_DATA
+        ST_RW_DATA,
+        ST_TRAIL
     } mdio_state_t;
 
     mdio_state_t state, next_state;
@@ -296,11 +297,16 @@ module axi_mdio #(
             ST_RW_DATA: begin
                 if (is_write) begin
                     if (mdc_fall && bit_cnt == 0)
-                        next_state = ST_IDLE;
+                        next_state = ST_TRAIL;
                 end else begin
                     if (mdc_rise && bit_cnt == 0)
-                        next_state = ST_IDLE;
+                        next_state = ST_TRAIL;
                 end
+            end
+
+            ST_TRAIL: begin
+                if (mdc_fall)
+                    next_state = ST_IDLE;
             end
 
             default: next_state = ST_IDLE;
@@ -319,25 +325,13 @@ module axi_mdio #(
         case (next_state)
                 // ─────────────────────────────────────────────────────
                 ST_IDLE: begin
-                    if (state == ST_RW_DATA) begin
-                        // Transaction completing
-                        status_busy <= 1'b0;
-                        status_done <= 1'b1;
-                        mdio_t      <= 1'b1;
+                    if (state == ST_TRAIL) begin
+                        // Trailing cycle complete — stop clock
                         mdc_en      <= 1'b0;
-                        if (is_write) begin
-                            // Output last write data bit
-                            mdio_o  <= shift_reg[31];
-                            shift_reg <= {shift_reg[30:0], 1'b0};
-                        end else begin
-                            // Capture last read data bit
-                            captured_rddata <= {captured_rddata[14:0], mdio_i};
-                            status_error    <= ta_error;
-                        end
                     end else begin
                         // Steady-state idle
                         mdio_t      <= 1'b1;
-                        mdio_o    <= 1'b1;
+                        mdio_o      <= 1'b1;
                         mdc_en      <= 1'b0;
                         status_busy <= 1'b0;
                     end
@@ -594,6 +588,23 @@ module axi_mdio #(
                             bit_cnt         <= bit_cnt - 1;
                         end
                     end
+                end
+
+                ST_TRAIL: begin
+                    if (state == ST_RW_DATA) begin
+                        // Entry: finish last bit, release bus, signal done
+                        status_busy <= 1'b0;
+                        status_done <= 1'b1;
+                        mdio_t      <= 1'b1;
+                        if (is_write) begin
+                            mdio_o    <= shift_reg[31];
+                            shift_reg <= {shift_reg[30:0], 1'b0};
+                        end else begin
+                            captured_rddata <= {captured_rddata[14:0], mdio_i};
+                            status_error    <= ta_error;
+                        end
+                    end
+                    // MDC keeps running; ST_IDLE entry will stop it
                 end
 
                 default: ;
